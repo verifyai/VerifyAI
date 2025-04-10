@@ -10,3 +10,7 @@
 //     return NextResponse.json({ error: "Failed to process restricted items" }, { status: 500 });
 //   }
 // }
+
+export async function GET() {
+    return new Response("Not implemented yet", { status: 501 });
+  }
