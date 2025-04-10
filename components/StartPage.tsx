@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import industries from "../public/data/industries.json";
 import { useActionState } from "react";
+import { useEffect } from "react";
 
 type Industry = {
   name: string;
@@ -27,9 +28,11 @@ export default function StartPage() {
   const [state, formAction] = useActionState(submitForm, { success: false });
 
   // Redirect after successful submission
-  if (state.success) {
-    router.push("/dashboard");
-  }
+  useEffect(() => {
+    if (state.success) {
+      router.push("/dashboard");
+    }
+  }, [state.success, router]);
 
   return (
     <div className="w-full min-h-screen flex flex-col justify-center items-center p-4">

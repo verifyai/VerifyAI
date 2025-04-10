@@ -119,7 +119,7 @@ export default function Dashboard() {
   
       setIsLoading(false);
     } catch (error) {
-      if (error.name === "AbortError") {
+      if (error instanceof Error && error.name === "AbortError") {
         console.log("Analysis request was canceled.");
       } else {
         console.error("Error analyzing website:", error);
@@ -168,33 +168,42 @@ export default function Dashboard() {
   // Starts website analysis once all necessary data is available
   useEffect(() => {
     const fromStartPage = sessionStorage.getItem("fromStartPage") === "true";
-    console.log("From Start Page:", fromStartPage); // Debugging
   
-    // Load previous analysis if available
-    const savedAnalysis = localStorage.getItem("lastAnalysis");
-    if (savedAnalysis) {
-      const parsedAnalysis = JSON.parse(savedAnalysis);
-      setAnalysisSummary(parsedAnalysis.screenshotAnalysis.metadata.summary || "No summary available.");
+    // Load previous analysis if available and NOT coming from StartPage
+    if (!fromStartPage) {
+      const savedAnalysis = localStorage.getItem("lastAnalysis");
+      if (savedAnalysis) {
+        const parsedAnalysis = JSON.parse(savedAnalysis);
+        setAnalysisSummary(parsedAnalysis.screenshotAnalysis.metadata.summary || "No summary available.");
+        setAnalysisScores({
+          overallScore: parsedAnalysis.screenshotAnalysis.score || 0,
+          restrictedItems: parsedAnalysis.screenshotAnalysis.metadata.restrictedItems || { score: 0, message: "" },
+          productPages: parsedAnalysis.screenshotAnalysis.metadata.productPages || { score: 0, message: "" },
+          ownership: parsedAnalysis.screenshotAnalysis.metadata.ownership || { score: 0, message: "" },
+          overallSafety: parsedAnalysis.screenshotAnalysis.metadata.overallSafety || { score: 0, message: "" },
+        });
+        setIsLoading(false);
+      }
+    } else {
+      console.log("Coming from Start Page. Resetting state and triggering new analysis...");
+      
+      // Hide previous analysis and set loading state
+      setAnalysisSummary("Fetching analysis...");
       setAnalysisScores({
-        overallScore: parsedAnalysis.screenshotAnalysis.score || 0,
-        restrictedItems: parsedAnalysis.screenshotAnalysis.metadata.restrictedItems || { score: 0, message: "" },
-        productPages: parsedAnalysis.screenshotAnalysis.metadata.productPages || { score: 0, message: "" },
-        ownership: parsedAnalysis.screenshotAnalysis.metadata.ownership || { score: 0, message: "" },
-        overallSafety: parsedAnalysis.screenshotAnalysis.metadata.overallSafety || { score: 0, message: "" },
+        overallScore: 0,
+        restrictedItems: { score: 0, message: "" },
+        productPages: { score: 0, message: "" },
+        ownership: { score: 0, message: "" },
+        overallSafety: { score: 0, message: "" },
       });
   
-      setIsLoading(false);
-    }
+      setIsLoading(true); // Show loading UI
   
-    // If user is coming from the Start Page, trigger new analysis
-    if (fromStartPage && Object.values(data).every((value) => value)) {
-      console.log("Starting new analysis...");
+      // Start new analysis
       startWebsiteAnalysis();
-      
-      // Remove the flag only after the analysis starts
+  
+      // Remove the session flag so this only happens once
       sessionStorage.removeItem("fromStartPage");
-    } else {
-      console.log("Not from Start Page. Skipping analysis.");
     }
   }, [data, startWebsiteAnalysis]);
   
