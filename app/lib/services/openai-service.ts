@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
-import { Request, Response, NextFunction } from 'express';
+// import { Request, Response, NextFunction } from 'express';
 // import { pineconeRestrictedService } from "./pineconeQuery-service";
 import { ProductData, ProductEmbedding } from '../types/product';
-import { RestrictedItemData } from '../types/restricted';
+// import { RestrictedItemData } from '../types/restricted';
 import { broadcastAlert } from '@/app/lib/eventEmitter';
 
 interface URLAnalysis {
@@ -12,9 +12,9 @@ interface URLAnalysis {
   suspicious: string;
 }
 
-interface ScrapedDataProduct {
-  cleanedProducts: ProductData[];
-}
+// interface ScrapedDataProduct {
+//   cleanedProducts: ProductData[];
+// }
 
 export class OpenAIService {
   private client: OpenAI;
@@ -26,7 +26,8 @@ export class OpenAIService {
   }
 
   async analyzeScreenshot(
-    screenshotUrl: string
+    screenshotUrl: string,
+    businessName: string
   ): Promise<Record<string, unknown>> {
     try {
       const response = await this.client.chat.completions.create({
@@ -38,7 +39,7 @@ export class OpenAIService {
               {
                 type: 'text',
                 text: `
-                The website in this screenshot is supposed to belong to "Nike" how confident are you that this is the case?
+                The website in this screenshot is supposed to belong to \`${businessName}\`. How confident are you that this is the case?
                 This website says they sell althletic clothing. How confident are you that this is the case?
                 This website may not sell any of these restricted items, which include:
 
@@ -61,9 +62,9 @@ export class OpenAIService {
                 How confident are you that:
 
                 1. The website does not sell any restricted items
-                2. The website has product pages
-                3. The website is owned by Nike
-                4. The website is safe overall
+                2. The website has product pages and sells products.
+                3. The website is owned by \`${businessName}\`.
+                4. The website is safe overall. Is not a scam website or would harm users that come to the site.
 
 
                 You should return a JSON object with this strucutre with no additional text and no markdown and no back ticks. Just the json object as I need to parse it as JSON.
@@ -204,129 +205,129 @@ export class OpenAIService {
 }
 
 // Add the middleware at the end of the file, before the singleton export
-export const analyzeProduct = async (
-  req: Request,
-  res: Response & {
-    locals: { scrapedData: ScrapedDataProduct; analysis: ProductEmbedding[] };
-  },
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const { cleanedProducts } = res.locals.scrapedData;
+// export const analyzeProduct = async (
+//   req: Request,
+//   res: Response & {
+//     locals: { scrapedData: ScrapedDataProduct; analysis: ProductEmbedding[] };
+//   },
+//   next: NextFunction
+// ): Promise<void> => {
+//   try {
+//     const { cleanedProducts } = res.locals.scrapedData;
 
-    if (!cleanedProducts || !Array.isArray(cleanedProducts)) {
-      throw new Error('Invalid or missing product data.');
-    }
+//     if (!cleanedProducts || !Array.isArray(cleanedProducts)) {
+//       throw new Error('Invalid or missing product data.');
+//     }
 
-    const analysis = await openAIService.embedProducts(cleanedProducts);
+//     const analysis = await openAIService.embedProducts(cleanedProducts);
 
-    res.locals.analysis = analysis;
-    next();
-  } catch (error) {
-    console.error('Error analyzing products:', error);
-    res.status(500).json({ error: (error as Error).message });
-  }
-};
+//     res.locals.analysis = analysis;
+//     next();
+//   } catch (error) {
+//     console.error('Error analyzing products:', error);
+//     res.status(500).json({ error: (error as Error).message });
+//   }
+// };
 
 /*
 ========================================
             Scrape Rating
 ========================================  
 */
-export class OpenAIServiceScrapeRating {
-  private client: OpenAI;
+// export class OpenAIServiceScrapeRating {
+//   private client: OpenAI;
 
-  constructor() {
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-  }
+//   constructor() {
+//     this.client = new OpenAI({
+//       apiKey: process.env.OPENAI_API_KEY,
+//     });
+//   }
 
-  async analyzeEmbeddingResponse(
-    restrictedMatches: { score: number; metadata: RestrictedItemData }[]
-  ): Promise<any> {
-    if (!restrictedMatches || restrictedMatches.length === 0) {
-      throw new Error('No restricted matches found.');
-    }
+//   async analyzeEmbeddingResponse(
+//     restrictedMatches: { score: number; metadata: RestrictedItemData }[]
+//   ): Promise<any> {
+//     if (!restrictedMatches || restrictedMatches.length === 0) {
+//       throw new Error('No restricted matches found.');
+//     }
 
-    const systemPrompt = `You are an AI designed to return JSON output only. 
-  Analyze the given restricted matches and return a risk assessment.
+//     const systemPrompt = `You are an AI designed to return JSON output only. 
+//   Analyze the given restricted matches and return a risk assessment.
 
-  **STRICTLY FOLLOW THIS FORMAT:**
-  {
-    "score": 1,
-    "metadata": {
-      "restrictedItems": 1,
-      "productPages": 1,
-      "ownership": 1,
-      "overallSafety": 1
-    }
-  }
+//   **STRICTLY FOLLOW THIS FORMAT:**
+//   {
+//     "score": 1,
+//     "metadata": {
+//       "restrictedItems": 1,
+//       "productPages": 1,
+//       "ownership": 1,
+//       "overallSafety": 1
+//     }
+//   }
 
-   Give a rating of 1-10 with 10 being the safest for ownership, lack of restricted items, and product pages, with an overall safety for all three as the fourth metric. 
-   The restrictedMatches score is a return from a vector database based on comparison between scraped data embeddings and prohibited items embeddings.
-   Consider the restrictedMatches scores as a metric for the safety of the provided categories with the score representing 0 as a 1-1 return of 100% presents restricted items and 1 being a 0-1 return of 0% presents no restricted items whatsoever.
-   Anything above a restrictedMatches score of .75 is considered a perfect score with an output of 10. 
+//    Give a rating of 1-10 with 10 being the safest for ownership, lack of restricted items, and product pages, with an overall safety for all three as the fourth metric. 
+//    The restrictedMatches score is a return from a vector database based on comparison between scraped data embeddings and prohibited items embeddings.
+//    Consider the restrictedMatches scores as a metric for the safety of the provided categories with the score representing 0 as a 1-1 return of 100% presents restricted items and 1 being a 0-1 return of 0% presents no restricted items whatsoever.
+//    Anything above a restrictedMatches score of .75 is considered a perfect score with an output of 10. 
 
-   Example: 
-    {
-    score: 0.715159714,
-    metadata: {
-      category: 'Gambling',
-      description: 'Casino games, sports betting, and lotteries'
-    }
-  },
-  Expected Output: 
-   "score": 9,
-    "metadata": {
-      "restrictedItems": 9,
-      "productPages": 9,
-      "ownership": 9,
-      "overallSafety": 9
-    }
+//    Example: 
+//     {
+//     score: 0.715159714,
+//     metadata: {
+//       category: 'Gambling',
+//       description: 'Casino games, sports betting, and lotteries'
+//     }
+//   },
+//   Expected Output: 
+//    "score": 9,
+//     "metadata": {
+//       "restrictedItems": 9,
+//       "productPages": 9,
+//       "ownership": 9,
+//       "overallSafety": 9
+//     }
 
-  DO NOT include any explanations, extra text, or commentary. ONLY return a JSON object exactly in the specified format.`;
+//   DO NOT include any explanations, extra text, or commentary. ONLY return a JSON object exactly in the specified format.`;
 
-    try {
-      const response = await this.client.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: `Here are the restricted matches: ${JSON.stringify(
-              restrictedMatches
-            )}`,
-          },
-        ],
-      });
+//     try {
+//       const response = await this.client.chat.completions.create({
+//         model: 'gpt-4',
+//         messages: [
+//           {
+//             role: 'system',
+//             content: systemPrompt,
+//           },
+//           {
+//             role: 'user',
+//             content: `Here are the restricted matches: ${JSON.stringify(
+//               restrictedMatches
+//             )}`,
+//           },
+//         ],
+//       });
 
-      const content = response.choices[0]?.message?.content?.trim();
+//       const content = response.choices[0]?.message?.content?.trim();
 
-      if (!content) {
-        throw new Error('No content returned from OpenAI');
-      }
+//       if (!content) {
+//         throw new Error('No content returned from OpenAI');
+//       }
 
-      // Force parsing as JSON
-      try {
-        const parsedResponse = JSON.parse(content);
-        return parsedResponse;
-      } catch (error) {
-        console.error('Failed to parse OpenAI response:', error);
-        throw new Error('OpenAI response was not valid JSON.');
-      }
-    } catch (error) {
-      console.error('Error analyzing embedding response:', error);
-      throw error;
-    }
-  }
-}
+//       // Force parsing as JSON
+//       try {
+//         const parsedResponse = JSON.parse(content);
+//         return parsedResponse;
+//       } catch (error) {
+//         console.error('Failed to parse OpenAI response:', error);
+//         throw new Error('OpenAI response was not valid JSON.');
+//       }
+//     } catch (error) {
+//       console.error('Error analyzing embedding response:', error);
+//       throw error;
+//     }
+//   }
+// }
 
 // Export a singleton instance
 export const openAIService = new OpenAIService();
 
 // At the bottom of the file, add:
-export const openAIServiceScrapeRating = new OpenAIServiceScrapeRating();
+// export const openAIServiceScrapeRating = new OpenAIServiceScrapeRating();

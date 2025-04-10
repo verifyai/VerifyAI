@@ -5,7 +5,7 @@ import { broadcastAlert } from '@/app/lib/eventEmitter';
 
 export async function POST(request: Request) {
   try {
-    const { screenshotUrl } = await request.json();
+    const { screenshotUrl, businessName } = await request.json();
 
     if (!screenshotUrl) {
       throw new Error("Screenshot URL is required.");
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       timestamp: Date.now(),
     });
 
-    const openAIResponse = await openAIService.analyzeScreenshot(imgbbUrl);
+    const openAIResponse = await openAIService.analyzeScreenshot(imgbbUrl, businessName);
 
     // ✅ Parse the `message` property (which contains the JSON as a string)
     let parsedMessage;

@@ -76,6 +76,7 @@ export default function Dashboard() {
         body: JSON.stringify({
           websiteUrl: data.websiteUrl,
           screenshotUrl: screenshotUrlHard,
+          businessName: data.businessName,
         }),
       });
 
@@ -105,7 +106,7 @@ export default function Dashboard() {
  
   const getColorClass = (score: number) => {
     if (score < 70) return 'bg-red-600';
-    if (score >= 70 && score <= 85) return 'bg-yellow-600';
+    if (score >= 60 && score <= 85) return 'bg-yellow-600';
     return 'bg-green-600';
   };
   
