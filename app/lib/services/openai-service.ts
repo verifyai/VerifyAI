@@ -233,17 +233,6 @@ export const analyzeProduct = async (
             Scrape Rating
 ========================================  
 */
-
-interface ScrapeRatingResponse {
-  score: number;
-  metadata: {
-    restrictedItems: number;
-    productPages: number;
-    ownership: number;
-    overallSafety: number;
-  };
-}
-
 export class OpenAIServiceScrapeRating {
   private client: OpenAI;
 
@@ -255,7 +244,7 @@ export class OpenAIServiceScrapeRating {
 
   async analyzeEmbeddingResponse(
     restrictedMatches: { score: number; metadata: RestrictedItemData }[]
-  ): Promise<ScrapeRatingResponse> {
+  ): Promise<any> {
     if (!restrictedMatches || restrictedMatches.length === 0) {
       throw new Error('No restricted matches found.');
     }
