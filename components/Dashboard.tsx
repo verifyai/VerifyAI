@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import EventStream from './EventStream';
 import { ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
@@ -287,9 +288,9 @@ export default function Dashboard() {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between gap-4">
-          <button className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200">
+            <Link href="/" className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200">
             <ArrowLeft className="h-4 w-4" /> Go Back
-          </button>
+            </Link>
           <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
             Continue <ArrowRight className="h-4 w-4" />
           </button>
