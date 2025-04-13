@@ -29,6 +29,8 @@ export async function POST(req: Request) {
       ignoreHTTPSErrors: true,
     });
 
+    console.log('Chromium executable path:', await chromium.executablePath());
+
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ imageUrl: `/screenshots/${filename}` });
+    
   } catch (error) {
     console.error('Error scraping website:', error);
     broadcastAlert({
@@ -114,4 +117,6 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ error: 'Error scraping website' }, { status: 500 });
   }
+
+  
 }

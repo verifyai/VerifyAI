@@ -1,26 +1,39 @@
 import { NextResponse } from "next/server";
+import sharp from 'sharp';
 import { openAIService } from "@/app/lib/services/openai-service";
-import { uploadToImgbb } from "@/app/lib/services/imgbb-service"; // ✅ Import Imgbb uploader
-import { broadcastAlert } from '@/app/lib/eventEmitter';
+import { uploadToImgbb } from "@/app/lib/services/imgbb-service";
+import { broadcastAlert } from "@/app/lib/eventEmitter";
 
 export async function POST(request: Request) {
   try {
-    const { screenshotUrl, businessName } = await request.json();
+    const formData = await request.formData();
+    const screenshotFile = formData.get("screenshot") as File;
+    const businessName = formData.get("businessName") as string;
 
-    if (!screenshotUrl) {
-      throw new Error("Screenshot URL is required.");
+    if (!screenshotFile || !businessName) {
+      throw new Error("Missing screenshot or business name.");
     }
 
-    console.log("📸 Screenshot URL:", screenshotUrl);
+    const buffer = Buffer.from(await screenshotFile.arrayBuffer());
 
-    // ✅ Fetch image and convert to buffer
-    const response = await fetch(screenshotUrl);
-    if (!response.ok) throw new Error("Failed to fetch screenshot image.");
+    broadcastAlert({
+      type: 'ImgBB',
+      message: `Uploading screenshot to Imgbb`,
+      timestamp: Date.now(),
+    });
 
-    const imageBuffer = await response.arrayBuffer();
+  const compressedBuffer = await sharp(buffer)
+    .resize({ width: 1024 }) // Resize to reduce resolution
+    .png({ quality: 80 })    // Lower PNG quality for faster load
+    .toBuffer();
 
-    // ✅ Upload to Imgbb
-    const imgbbUrl = await uploadToImgbb(Buffer.from(imageBuffer));
+    broadcastAlert({
+      type: 'ImageCompression',
+      message: `Compressing Image`,
+      timestamp: Date.now(),
+    });
+
+    const imgbbUrl = await uploadToImgbb(compressedBuffer);
 
     broadcastAlert({
       type: 'ImgBB',
@@ -30,7 +43,6 @@ export async function POST(request: Request) {
 
     console.log("✅ Image uploaded to Imgbb:", imgbbUrl);
 
-    // ✅ Send the Imgbb URL to OpenAI
     broadcastAlert({
       type: 'OpenAI',
       message: `Sending screenshot to OpenAI`,
@@ -39,7 +51,6 @@ export async function POST(request: Request) {
 
     const openAIResponse = await openAIService.analyzeScreenshot(imgbbUrl, businessName);
 
-    // ✅ Parse the `message` property (which contains the JSON as a string)
     let parsedMessage;
     try {
       parsedMessage = JSON.parse(openAIResponse.message as string);
@@ -50,7 +61,6 @@ export async function POST(request: Request) {
 
     console.log("✅ Parsed OpenAI Message:", parsedMessage);
 
-    // ✅ Ensure the parsed response follows the expected structure
     const screenshotAnalysis = {
       score: parsedMessage.score ?? 0,
       metadata: {
@@ -64,10 +74,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       message: "Analysis completed",
-      screenshotAnalysis, // ✅ Pass the parsed and structured response
+      screenshotAnalysis,
       imgbbUrl,
     });
-
   } catch (error) {
     console.error("❌ Error:", error);
     return NextResponse.json(
@@ -78,5 +87,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
