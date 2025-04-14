@@ -30,6 +30,8 @@ export default function Dashboard() {
     overallSafety: { score: 0, message: '' },
   });
 
+  const [screenshotBlob, setScreenshotBlob] = useState<Blob | null>(null);
+
   // Hardcoded confidence scores as fallback
   const confidenceScores = {
     Ownership: analysisScores.ownership.score || 95,
@@ -49,48 +51,46 @@ export default function Dashboard() {
     try {
       const websiteUrl = localStorage.getItem('websiteUrl');
       if (!websiteUrl) throw new Error('No website URL found in localStorage.');
-
-      const response = await fetch('/api/screenshot', {
+  
+      const response = await fetch('/api/screenshotapi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: websiteUrl }),
       });
-
-      const data = await response.json();
-      localStorage.setItem('screenshotUrl', data.imageUrl);
-      return data.imageUrl;
+  
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+  
+      // Save for image display
+      localStorage.setItem('screenshot', objectUrl);
+  
+      return { blob, objectUrl };
     } catch (error) {
-      console.error('Error during loading:', error);
+      console.error('Error fetching screenshot:', error);
       return null;
     }
   };
+  
 
   // Sends the website URL and screenshot to the API for analysis, then updates the state
   const startWebsiteAnalysis = useCallback(async () => {
     try {
-      console.log('Starting website analysis...');
-      const screenshotUrlHard = `http://localhost:3000${data.screenshotUrl}`;
-
+      if (!screenshotBlob) throw new Error('No screenshot blob available.');
+  
+      const formData = new FormData();
+      formData.append('screenshot', screenshotBlob, 'screenshot.png');
+      formData.append('websiteUrl', data.websiteUrl);
+      formData.append('businessName', data.businessName);
+  
       const response = await fetch('/api/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          websiteUrl: data.websiteUrl,
-          screenshotUrl: screenshotUrlHard,
-          businessName: data.businessName,
-        }),
+        body: formData,
       });
-
+  
       if (!response.ok) throw new Error('Failed to analyze website');
-
       const result = await response.json();
-
-      console.log('Full API Response:', result);
-
-      // Extract and update the summary
+  
       setAnalysisSummary(result.screenshotAnalysis.metadata.summary || 'No summary available.');
-
-      // Store confidence scores from OpenAI response
       setAnalysisScores({
         overallScore: result.screenshotAnalysis.score || 0,
         restrictedItems: result.screenshotAnalysis.metadata.restrictedItems || { score: 0, message: '' },
@@ -98,12 +98,12 @@ export default function Dashboard() {
         ownership: result.screenshotAnalysis.metadata.ownership || { score: 0, message: '' },
         overallSafety: result.screenshotAnalysis.metadata.overallSafety || { score: 0, message: '' },
       });
-
+  
       setIsLoading(false);
     } catch (error) {
       console.error('Error analyzing website:', error);
     }
-  }, [data]);
+  }, [data, screenshotBlob]);
  
   const getColorClass = (score: number) => {
     if (score < 70) return 'bg-red-600';
@@ -115,18 +115,23 @@ export default function Dashboard() {
   // Initializes data when the component mounts (fetches website info and screenshot)
   useEffect(() => {
     const initializeData = async () => {
-      const screenshotUrl = await fetchScreenshot();
+      const screenshotResult = await fetchScreenshot();
+  
       setData({
-        screenshotUrl: screenshotUrl || '',
+        screenshotUrl: screenshotResult?.objectUrl || '',
         websiteUrl: localStorage.getItem('websiteUrl') || '',
         businessName: localStorage.getItem('businessName') || '',
         industry: localStorage.getItem('industry') || '',
         description: localStorage.getItem('description') || '',
       });
+  
+      // Save blob for analysis
+      setScreenshotBlob(screenshotResult?.blob || null);
     };
-
+  
     initializeData();
   }, []);
+  
 
   // Starts website analysis once all necessary data is available
   useEffect(() => {

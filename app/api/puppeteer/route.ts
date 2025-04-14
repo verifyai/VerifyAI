@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium-min';
+import puppeteer from 'puppeteer-core';
 import fs from 'fs';
 import path from 'path';
 import { broadcastAlert } from '@/app/lib/eventEmitter';
@@ -7,6 +8,7 @@ import { broadcastAlert } from '@/app/lib/eventEmitter';
 export async function POST(req: Request) {
   const body = await req.json();
   const { url } = body;
+
   try {
     if (!url) {
       console.log('Error: No URL provided');
@@ -20,11 +22,16 @@ export async function POST(req: Request) {
     });
 
     const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless === 'new' ? true : chromium.headless,
+      ignoreHTTPSErrors: true,
     });
-    const page = await browser.newPage();
 
-    // Navigate to the page and wait for initial load
+    console.log('Chromium executable path:', await chromium.executablePath());
+
+    const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     broadcastAlert({
@@ -33,7 +40,6 @@ export async function POST(req: Request) {
       timestamp: Date.now(),
     });
 
-    // Scroll to the bottom of the page to trigger lazy loading
     for (let i = 0; i < 2; i++) {
       await page.evaluate(async () => {
         await new Promise((resolve) => {
@@ -58,7 +64,6 @@ export async function POST(req: Request) {
         timestamp: Date.now(),
       });
 
-      // Wait a bit before the next scroll
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
 
@@ -68,39 +73,28 @@ export async function POST(req: Request) {
       timestamp: Date.now(),
     });
 
-    // Scroll back to the top of the page
     await page.evaluate(() => window.scrollTo(0, 0));
-
-    // Wait for the content to load (use a broad selector or function for reliability)
     await page.waitForSelector('body', { timeout: 120000 });
-
-    // Optional: Add an extra delay
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    // Take a full-page screenshot
     const screenshot = await page.screenshot({
       fullPage: true,
       encoding: 'base64',
     });
 
-    broadcastAlert({
-      type: 'screenshot',
-      message: `Screenshot taken for ${url}`,
-      timestamp: Date.now(),
-    });
+    if (!screenshot || typeof screenshot !== 'string') {
+      throw new Error('Failed to capture screenshot');
+    }
 
-    // Create a directory for screenshots if it doesn't exist
     const screenshotsDir = path.join(process.cwd(), 'public', 'screenshots');
     if (!fs.existsSync(screenshotsDir)) {
       fs.mkdirSync(screenshotsDir, { recursive: true });
     }
 
-    // Generate filename with timestamp
     const timestamp = Date.now();
     const filename = `screenshot-${timestamp}.png`;
     const filepath = path.join(screenshotsDir, filename);
 
-    // Convert base64 to buffer and save
     const buffer = Buffer.from(screenshot, 'base64');
     fs.writeFileSync(filepath, buffer);
 
@@ -112,22 +106,17 @@ export async function POST(req: Request) {
       timestamp: Date.now(),
     });
 
-    return NextResponse.json({
-      imageUrl:  `/screenshots/${filename}`,// URL path to access the image
-    });
+    return NextResponse.json({ imageUrl: `/screenshots/${filename}` });
+    
   } catch (error) {
     console.error('Error scraping website:', error);
-
     broadcastAlert({
       type: 'error',
-      message: `Error scraping ${url}: ${
-        error instanceof Error ? error.message : 'Error while sctraping website'
-      }`,
+      message: `Error scraping ${url}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       timestamp: Date.now(),
     });
-    return NextResponse.json(
-      { error: 'Error scraping website' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Error scraping website' }, { status: 500 });
   }
+
+  
 }

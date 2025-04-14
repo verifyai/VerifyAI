@@ -26,7 +26,7 @@ export class OpenAIService {
   }
 
   async analyzeScreenshot(
-    screenshotUrl: string,
+    base64Image: string,
     businessName: string
   ): Promise<Record<string, unknown>> {
     try {
@@ -40,7 +40,6 @@ export class OpenAIService {
                 type: 'text',
                 text: `
                 The website in this screenshot is supposed to belong to \`${businessName}\`. How confident are you that this is the case?
-                This website says they sell althletic clothing. How confident are you that this is the case?
                 This website may not sell any of these restricted items, which include:
 
                 Drugs and drug paraphernalia (e.g., narcotics, controlled substances, and any equipment designed for making or using drugs)
@@ -67,7 +66,7 @@ export class OpenAIService {
                 4. The website is safe overall. Is not a scam website or would harm users that come to the site.
 
 
-                You should return a JSON object with this strucutre with no additional text and no markdown and no back ticks. Just the json object as I need to parse it as JSON.
+                You are an API that returns structured evaluations in JSON. Do not explain your answers or include any markdown formatting. Do NOT wrap the response in triple backticks. Always respond with only a raw JSON object that can be directly parsed by JSON.parse().
 
                 {
                   "score": (overall score as an average of the 4 scores),
@@ -96,7 +95,7 @@ export class OpenAIService {
               {
                 type: 'image_url',
                 image_url: {
-                  url: screenshotUrl,
+                  url: `data:image/png;base64,${base64Image}`,
                 },
               },
             ],

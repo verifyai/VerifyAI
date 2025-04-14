@@ -1,45 +1,44 @@
 import { NextResponse } from "next/server";
+import sharp from 'sharp';
 import { openAIService } from "@/app/lib/services/openai-service";
-import { uploadToImgbb } from "@/app/lib/services/imgbb-service"; // ✅ Import Imgbb uploader
-import { broadcastAlert } from '@/app/lib/eventEmitter';
+import { broadcastAlert } from "@/app/lib/eventEmitter";
 
 export async function POST(request: Request) {
   try {
-    const { screenshotUrl, businessName } = await request.json();
+    const formData = await request.formData();
+    const screenshotFile = formData.get("screenshot") as File;
+    const businessName = formData.get("businessName") as string;
 
-    if (!screenshotUrl) {
-      throw new Error("Screenshot URL is required.");
+    if (!screenshotFile || !businessName) {
+      throw new Error("Missing screenshot or business name.");
     }
 
-    console.log("📸 Screenshot URL:", screenshotUrl);
-
-    // ✅ Fetch image and convert to buffer
-    const response = await fetch(screenshotUrl);
-    if (!response.ok) throw new Error("Failed to fetch screenshot image.");
-
-    const imageBuffer = await response.arrayBuffer();
-
-    // ✅ Upload to Imgbb
-    const imgbbUrl = await uploadToImgbb(Buffer.from(imageBuffer));
+    const buffer = Buffer.from(await screenshotFile.arrayBuffer());
 
     broadcastAlert({
-      type: 'ImgBB',
-      message: `Screenshot uploaded to the web`,
+      type: 'ImageCompression',
+      message: `Compressing Image`,
       timestamp: Date.now(),
     });
 
-    console.log("✅ Image uploaded to Imgbb:", imgbbUrl);
+    // ✅ Compress the image before conversion
+    const compressedBuffer = await sharp(buffer)
+      .resize({ width: 800 })
+      .png({ quality: 70 }) 
+      .toBuffer();
 
-    // ✅ Send the Imgbb URL to OpenAI
+    // ✅ Convert to base64
+    const base64Image = compressedBuffer.toString("base64");
+
     broadcastAlert({
       type: 'OpenAI',
       message: `Sending screenshot to OpenAI`,
       timestamp: Date.now(),
     });
 
-    const openAIResponse = await openAIService.analyzeScreenshot(imgbbUrl, businessName);
+    const openAIResponse = await openAIService.analyzeScreenshot(base64Image, businessName);
 
-    // ✅ Parse the `message` property (which contains the JSON as a string)
+    // ✅ Parse OpenAI JSON response
     let parsedMessage;
     try {
       parsedMessage = JSON.parse(openAIResponse.message as string);
@@ -50,7 +49,6 @@ export async function POST(request: Request) {
 
     console.log("✅ Parsed OpenAI Message:", parsedMessage);
 
-    // ✅ Ensure the parsed response follows the expected structure
     const screenshotAnalysis = {
       score: parsedMessage.score ?? 0,
       metadata: {
@@ -64,8 +62,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       message: "Analysis completed",
-      screenshotAnalysis, // ✅ Pass the parsed and structured response
-      imgbbUrl,
+      screenshotAnalysis,
     });
 
   } catch (error) {
@@ -78,5 +75,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
+
 
 
