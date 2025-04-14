@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from 'sharp';
 import { openAIService } from "@/app/lib/services/openai-service";
-import { uploadToImgbb } from "@/app/lib/services/imgbb-service";
 import { broadcastAlert } from "@/app/lib/eventEmitter";
 
 export async function POST(request: Request) {
@@ -17,31 +16,19 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await screenshotFile.arrayBuffer());
 
     broadcastAlert({
-      type: 'ImgBB',
-      message: `Uploading screenshot to Imgbb`,
-      timestamp: Date.now(),
-    });
-
-  const compressedBuffer = await sharp(buffer)
-    .resize({ width: 1024 }) // Resize to reduce resolution
-    .png({ quality: 80 })    // Lower PNG quality for faster load
-    .toBuffer();
-
-    broadcastAlert({
       type: 'ImageCompression',
       message: `Compressing Image`,
       timestamp: Date.now(),
     });
 
-    const imgbbUrl = await uploadToImgbb(compressedBuffer);
+    // ✅ Compress the image before conversion
+    const compressedBuffer = await sharp(buffer)
+      .resize({ width: 1024 }) // Optional but helpful
+      .png({ quality: 80 })    // Reduce size
+      .toBuffer();
 
-    broadcastAlert({
-      type: 'ImgBB',
-      message: `Screenshot uploaded to the web`,
-      timestamp: Date.now(),
-    });
-
-    console.log("✅ Image uploaded to Imgbb:", imgbbUrl);
+    // ✅ Convert to base64
+    const base64Image = compressedBuffer.toString("base64");
 
     broadcastAlert({
       type: 'OpenAI',
@@ -49,8 +36,9 @@ export async function POST(request: Request) {
       timestamp: Date.now(),
     });
 
-    const openAIResponse = await openAIService.analyzeScreenshot(imgbbUrl, businessName);
+    const openAIResponse = await openAIService.analyzeScreenshot(base64Image, businessName);
 
+    // ✅ Parse OpenAI JSON response
     let parsedMessage;
     try {
       parsedMessage = JSON.parse(openAIResponse.message as string);
@@ -75,8 +63,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: "Analysis completed",
       screenshotAnalysis,
-      imgbbUrl,
     });
+
   } catch (error) {
     console.error("❌ Error:", error);
     return NextResponse.json(
@@ -87,6 +75,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

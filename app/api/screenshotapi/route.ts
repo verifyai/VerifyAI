@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 // @ts-expect-error: no types
 import screenshotmachine from 'screenshotmachine';
+import { broadcastAlert } from "@/app/lib/eventEmitter";
 
 export async function POST(req: Request) {
   const { url } = await req.json();
@@ -30,6 +31,12 @@ export async function POST(req: Request) {
     if (!screenshotResponse.ok || !screenshotResponse.body) {
       throw new Error('ScreenshotMachine API failed');
     }
+
+    broadcastAlert({
+      type: 'Website recorded',
+      message: `Website recorded`,
+      timestamp: Date.now(),
+    });
 
     const arrayBuffer = await screenshotResponse.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

@@ -26,7 +26,7 @@ export class OpenAIService {
   }
 
   async analyzeScreenshot(
-    screenshotUrl: string,
+    base64Image: string,
     businessName: string
   ): Promise<Record<string, unknown>> {
     try {
@@ -95,7 +95,7 @@ export class OpenAIService {
               {
                 type: 'image_url',
                 image_url: {
-                  url: screenshotUrl,
+                  url: `data:image/png;base64,${base64Image}`,
                 },
               },
             ],
