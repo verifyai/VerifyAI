@@ -23,8 +23,8 @@ export async function POST(request: Request) {
 
     // ✅ Compress the image before conversion
     const compressedBuffer = await sharp(buffer)
-      .resize({ width: 1024 }) // Optional but helpful
-      .png({ quality: 80 })    // Reduce size
+      .resize({ width: 800 })
+      .png({ quality: 70 }) 
       .toBuffer();
 
     // ✅ Convert to base64

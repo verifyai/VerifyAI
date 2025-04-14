@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     device: 'desktop',
     format: 'png',
     cacheLimit: '0',
-    delay: '2000',
+    delay: '500', 
     zoom: '100',
   };
 
@@ -27,10 +27,14 @@ export async function POST(req: Request) {
 
   try {
     const screenshotResponse = await fetch(apiUrl);
+    const contentType = screenshotResponse.headers.get("content-type");
 
-    if (!screenshotResponse.ok || !screenshotResponse.body) {
-      throw new Error('ScreenshotMachine API failed');
+    if (!screenshotResponse.ok || !contentType?.startsWith("image/")) {
+      throw new Error('ScreenshotMachine did not return a valid image');
     }
+
+    const arrayBuffer = await screenshotResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
     broadcastAlert({
       type: 'Website recorded',
@@ -38,17 +42,15 @@ export async function POST(req: Request) {
       timestamp: Date.now(),
     });
 
-    const arrayBuffer = await screenshotResponse.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // ✅ Return the image buffer as a Response
     return new Response(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'image/png',
         'Content-Disposition': 'inline; filename="screenshot.png"',
+        'Cache-Control': 'no-store',
       },
     });
+
   } catch (error) {
     console.error('❌ Error capturing screenshot:', error);
     return NextResponse.json(
